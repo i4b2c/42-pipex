@@ -1,33 +1,5 @@
 #include "pipex.h"
 
-//O QUE TEM QUE FAZER NO PIPEX ?
-//./pipex file1 cmd1 cmd2 file2
-
-//1 - escrever
-//0 - ler
-
-/*void exec_command(char *str)
-{
-
-}*/
-
-
-int	ft_strncmp(char *s1, char *s2, unsigned int n)
-{
-	unsigned int	i;
-
-	i = 0;
-	while (i < n && s1[i] != '\0' && s2[i] != '\0')
-	{
-		if (s1[i] != s2[i])
-			break ;
-		i++;
-	}
-	if (n == 0 || n == i)
-		return (0);
-	return ((unsigned char)s1[i] - (unsigned char)s2[i]);
-}
-
 void ft_strcpy_path(char *s1, char *s2)
 {
 	int i = 5;
@@ -39,25 +11,11 @@ void ft_strcpy_path(char *s1, char *s2)
 		j++;
 	}
 }
-
-
-int ft_strlen(char *str)
-{
-	int i = 0;
-	while(str[i] != 0)
-		i++;
-	return i;
-}
-
-// void split_path(char **path_split, char *path_simple)
-// {
-
-// }
-
-char *getpath(char **str)
+char **getpath(char **str)
 {
 	int i = 0;
 	char *path_simple;
+	char **path;
 	while(str[i] != NULL)
 	{
 		if(!(ft_strncmp("PATH=",str[i],5)))
@@ -67,17 +25,12 @@ char *getpath(char **str)
 		}
 		i++;
 	}
-	return (path_simple);
-	//split_path(path_split,path_simple);
-	//printf("%s\n",path);
+	path = NULL;
+	path = ft_split(path_simple,':');
+	free(path_simple);
+	return (path);
 }
 
-void print_all(char **str)
-{
-	int i = 0;
-	while(str[i])
-		printf("%s\n",str[i++]);
-}
 
 char  *check_command(char *command, char **path)
 {
@@ -97,85 +50,75 @@ char  *check_command(char *command, char **path)
 	}
 	return NULL;
 }
+void error(void)
+{
+	write(2,"Error\n",6);
+	exit(EXIT_FAILURE);
+}
 
-int main(int ac,char **av,char **envp)
+void exec(char *command, char **envp)
+{
+	char **path;
+	char *check;
+	char **cmd;
+
+	cmd = ft_split(command,' ');
+	path = getpath(envp);
+	check = check_command(cmd[0],path);
+	if(check != NULL)
+		execve(check,cmd,envp);
+	return ;
+}
+
+void child_process(char **av, char **envp,int fd[2])
+{
+	int file;
+
+	file = open(av[1],O_RDONLY);
+	if(file < 0)
+		error();
+	dup2(fd[1],STDOUT_FILENO);
+	dup2(file,STDIN_FILENO);
+	close(fd[0]);
+	exec(av[2],envp);
+	return ;
+}
+
+void parent_process(char **av, char **envp, int fd[2])
+{
+	int file;
+
+	file = open(av[4],O_WRONLY | O_CREAT | O_TRUNC , 0777);
+	if(file < 0)
+		error();
+	dup2(fd[0],STDIN_FILENO);
+	dup2(file,STDOUT_FILENO);
+	close(fd[1]);
+	exec(av[3],envp);
+	return ;
+}
+
+void pipex(char **av, char **envp)
 {
 	int fd[2];
 	pid_t pid;
-	int new_fd;
-	char **path_split = malloc(sizeof(char *));
-	char *path_simple = NULL;
-	char **command;
 
 	pipe(fd);
-	if(ac != 5)
-	{
-		write(2,"Error\n",6);
-		return -1;
-	}
-	path_simple = getpath(envp);
-	path_split = ft_split(path_simple,':');
-	char *check = NULL;
 	pid = fork();
-	if(pid == (pid_t) 0)
-	{
-		close(fd[0]);//fecha porque nao preciso ler
-		new_fd = open("teste.txt", O_WRONLY | O_APPEND | O_CREAT , 0777);
-		command = ft_split(av[2],' ');
-		check = check_command(command[0],path_split);
-		dup2(new_fd,1);
-		if(check != NULL)
-		{
-			int a = 0;
-			while(command[a] != NULL)
-				a++;
-			command[a] = malloc(256);
-			ft_strcpy(command[a],av[1]);
-			command[a+1] = NULL;
-			execve(check,command,NULL);
-		}
-		else
-			perror("Errro ");
-		close(new_fd);
-	}
-	else if(pid < (pid_t) 0)
-	{
-		write(2,"Error\n",6);
-		return -1;
-	}
+	if(pid == 0)
+		child_process(av,envp,fd);
 	else
 	{
-		wait(NULL);
-		close(fd[1]);//fecha porque nao preciso escrever
-		pid = fork();
-		if(pid == 0)
-		{
-			new_fd = open("teste.txt",O_RDONLY);
-			command = ft_split(av[3],' ');
-			check = check_command(command[0],path_split);
-			if(check != NULL)
-			{
-				int a = 0;
-				while(command[a] != NULL)
-					a++;
-				command[a] = malloc(256);
-				ft_strcpy(command[a],av[1]);
-				command[a+1] = NULL;
-				close(new_fd);
-				new_fd = open(av[4], O_WRONLY | O_APPEND | O_CREAT , 0777);
-				dup2(new_fd,1);
-				execve(check,command,NULL);
-			}
-			else
-				perror("Error ");
-		}
-		else
-		{
-			wait(NULL);
-			unlink("teste.txt");//deleta o teste.txt
-			printf("dinoguei lindo\n");
-		}
-
+		waitpid(pid,NULL,0);
+		parent_process(av,envp,fd);
 	}
+	return ;
+}
+
+int main(int ac, char **av, char **envp)
+{
+	if(ac != 5)
+		error();
+	pipex(av,envp);
 	return 0;
 }

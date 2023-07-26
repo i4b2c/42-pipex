@@ -1,124 +1,80 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: icaldas <icaldas@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2023/07/26 13:32:41 by icaldas           #+#    #+#             */
+/*   Updated: 2023/07/26 13:34:01 by icaldas          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "pipex.h"
 
-void ft_strcpy_path(char *s1, char *s2)
+void	exec(char *command, char **envp)
 {
-	int i = 5;
-	int j = 0;
-	while(s2[i] != 0)
-	{
-		s1[j] = s2[i];
-		i++;
-		j++;
-	}
-}
-char **getpath(char **str)
-{
-	int i = 0;
-	char *path_simple;
-	char **path;
-	while(str[i] != NULL)
-	{
-		if(!(ft_strncmp("PATH=",str[i],5)))
-		{
-			path_simple = malloc(ft_strlen(str[i]));
-			ft_strcpy_path(path_simple,str[i]);
-		}
-		i++;
-	}
-	path = NULL;
-	path = ft_split(path_simple,':');
-	free(path_simple);
-	return (path);
-}
+	char	**path;
+	char	*check;
+	char	**cmd;
 
-
-char  *check_command(char *command, char **path)
-{
-	char *teste;
-	int i = 0;
-
-	while(path[i] != NULL)
-	{
-		teste = malloc(256);
-		ft_strcpy(teste,path[i]);
-		ft_strlcat(teste,"/",256);
-		ft_strlcat(teste,command,256);
-		if(access(teste,X_OK) == 0)
-			return teste;
-		i++;
-		free(teste);
-	}
-	return NULL;
-}
-void error(void)
-{
-	write(2,"Error\n",6);
-	exit(EXIT_FAILURE);
-}
-
-void exec(char *command, char **envp)
-{
-	char **path;
-	char *check;
-	char **cmd;
-
-	cmd = ft_split(command,' ');
+	cmd = ft_split(command, ' ');
 	path = getpath(envp);
-	check = check_command(cmd[0],path);
-	if(check != NULL)
-		execve(check,cmd,envp);
+	check = check_command(cmd[0], path);
+	if (check != NULL)
+		execve(check, cmd, envp);
 	return ;
 }
 
-void child_process(char **av, char **envp,int fd[2])
+void	child_process(char **av, char **envp, int fd[2])
 {
-	int file;
+	int	file;
 
-	file = open(av[1],O_RDONLY);
-	if(file < 0)
+	file = open(av[1], O_RDONLY);
+	if (file < 0)
 		error();
-	dup2(fd[1],STDOUT_FILENO);
-	dup2(file,STDIN_FILENO);
+	dup2(fd[1], STDOUT_FILENO);
+	dup2(file, STDIN_FILENO);
 	close(fd[0]);
-	exec(av[2],envp);
+	exec(av[2], envp);
 	return ;
 }
 
-void parent_process(char **av, char **envp, int fd[2])
+void	parent_process(char **av, char **envp, int fd[2])
 {
-	int file;
+	int	file;
 
-	file = open(av[4],O_WRONLY | O_CREAT | O_TRUNC , 0777);
-	if(file < 0)
+	file = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0777);
+	if (file < 0)
 		error();
-	dup2(fd[0],STDIN_FILENO);
-	dup2(file,STDOUT_FILENO);
+	dup2(fd[0], STDIN_FILENO);
+	dup2(file, STDOUT_FILENO);
 	close(fd[1]);
-	exec(av[3],envp);
+	exec(av[3], envp);
 	return ;
 }
 
-void pipex(char **av, char **envp)
+void	pipex(char **av, char **envp)
 {
-	int fd[2];
-	pid_t pid;
+	int		fd[2];
+	pid_t	pid;
 
 	pipe(fd);
 	pid = fork();
-	if(pid == 0)
-		child_process(av,envp,fd);
+	if (pid == 0)
+		child_process(av, envp, fd);
 	else
 	{
-		waitpid(pid,NULL,0);
-		parent_process(av,envp,fd);
+		waitpid(pid, NULL, 0);
+		parent_process(av, envp, fd);
 	}
 	return ;
 }
 
-int main(int ac, char **av, char **envp)
+int	main(int ac, char **av, char **envp)
 {
-	if(ac != 5)
+	if (ac != 5)
 		error();
-	pipex(av,envp);
-	return 0;
+	pipex(av, envp);
+	return (0);
 }

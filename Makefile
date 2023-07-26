@@ -21,4 +21,9 @@ fclean: clean
 	@make fclean -C libft/
 	@rm -rf $(NAME)
 
+git:
+	git add *
+	git commit -m .
+	git push
+
 re: fclean all
